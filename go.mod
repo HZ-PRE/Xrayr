@@ -17,8 +17,8 @@ require (
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/r3labs/diff/v2 v2.15.1
 	github.com/redis/go-redis/v9 v9.7.0
-	github.com/sagernet/sing v0.5.1
-	github.com/sagernet/sing-shadowsocks v0.2.7
+	github.com/sagernet/sing v0.7.6
+	github.com/sagernet/sing-shadowsocks v0.2.9
 	github.com/shirou/gopsutil/v3 v3.24.5
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/cobra v1.8.1
@@ -245,7 +245,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gvisor.dev/gvisor v0.0.0-20240320123526-dc6abceb7ff0 // indirect
-	lukechampine.com/blake3 v1.4.0 // indirect
+	lukechampine.com/blake3 v1.4.1 // indirect
 )
 
 replace github.com/exoscale/egoscale => github.com/exoscale/egoscale v0.102.3
