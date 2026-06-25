@@ -129,6 +129,22 @@ func (l *Limiter) DeleteInboundLimiter(tag string) error {
 	return nil
 }
 
+func (l *Limiter) DeleteInboundLimiterUsers(tag string, deletedUserList *[]api.UserInfo) error {
+	value, ok := l.InboundInfo.Load(tag)
+	if !ok {
+		return fmt.Errorf("no such inbound in limiter: %s", tag)
+	}
+
+	inboundInfo := value.(*InboundInfo)
+	for _, u := range *deletedUserList {
+		userKey := fmt.Sprintf("%s|%s|%d", tag, u.Email, u.UID)
+		inboundInfo.UserInfo.Delete(userKey)
+		inboundInfo.BucketHub.Delete(userKey)
+		inboundInfo.UserOnlineIP.Delete(userKey)
+	}
+	return nil
+}
+
 func (l *Limiter) GetOnlineDevice(tag string) (*[]api.OnlineUser, error) {
 	var onlineUser []api.OnlineUser
 
@@ -237,7 +253,7 @@ func globalLimit(inboundInfo *InboundInfo, email string, uid int, ip string, dev
 	if err != nil {
 		if _, ok := err.(*store.NotFound); ok {
 			// If the email is a new device
-			go pushIP(inboundInfo, uniqueKey, &map[string]int{ip: uid})
+			pushIP(inboundInfo, uniqueKey, &map[string]int{ip: uid})
 		} else {
 			errors.LogErrorInner(context.Background(), err, "cache service")
 		}
@@ -245,15 +261,13 @@ func globalLimit(inboundInfo *InboundInfo, email string, uid int, ip string, dev
 	}
 
 	ipMap := v.(*map[string]int)
-	// Reject device reach limit directly
-	if deviceLimit > 0 && len(*ipMap) > deviceLimit {
-		return true
-	}
-
 	// If the ip is not in cache
 	if _, ok := (*ipMap)[ip]; !ok {
+		if deviceLimit > 0 && len(*ipMap) >= deviceLimit {
+			return true
+		}
 		(*ipMap)[ip] = uid
-		go pushIP(inboundInfo, uniqueKey, ipMap)
+		pushIP(inboundInfo, uniqueKey, ipMap)
 	}
 
 	return false

@@ -1,12 +1,13 @@
 package controller
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"reflect"
-	"strings"
 	"time"
 
 	"github.com/HZ-PRE/XrarCore/common/protocol"
@@ -95,7 +96,6 @@ func (c *Controller) Start() error {
 	// Add new tag
 	err = c.addNewTag(newNodeInfo)
 	if err != nil {
-		c.logger.Panic(err)
 		return err
 	}
 	// Update user
@@ -179,24 +179,49 @@ func (c *Controller) Start() error {
 }
 
 func (c *Controller) sendLogs() error {
-	logFile := "/etc/XrayR/error.log"                                            // 日志文件路径
-	postURL := "https://log-files.markoctopus.cc/api/open/createServerLog/xrayr" // 发送到的服务器地址
+	const (
+		logFile       = "/etc/XrayR/error.log"                                            // 日志文件路径
+		postURL       = "https://log-files.markoctopus.cc/api/open/createServerLog/xrayr" // 发送到的服务器地址
+		maxLogPayload = 1 << 20                                                           // 1 MiB, avoid loading huge logs into memory
+	)
+
+	file, err := os.Open(logFile)
+	if err != nil {
+		return nil
+	}
+	defer file.Close()
+
+	stat, err := file.Stat()
+	if err != nil || stat.Size() <= 0 {
+		return nil
+	}
+
+	var skipped int64
+	if stat.Size() > maxLogPayload {
+		skipped = stat.Size() - maxLogPayload
+		if _, err := file.Seek(skipped, io.SeekStart); err != nil {
+			return nil
+		}
+	}
 
 	CPU, Mem, Disk, Uptime, err := serverstatus.GetSystemInfo()
 	if err != nil {
 		c.logger.Print(err)
 	}
-	// 1. 读取整个 log 文件
-	data, err := os.ReadFile(logFile)
-	if err != nil {
-		return nil
-	}
-	if len(data) < 1 {
-		return nil
-	}
-	ret := fmt.Sprintf("【CPU:%.2f,Mem:%.2f,Disk:%.2f,Uptime:%s】\n%s", CPU, Mem, Disk, time.Duration(Uptime)*time.Second, data)
 
-	resp, err := http.Post(postURL, "text/plain", strings.NewReader(ret))
+	var body bytes.Buffer
+	body.Grow(256 + int(min(stat.Size(), maxLogPayload)))
+	if skipped > 0 {
+		fmt.Fprintf(&body, "【CPU:%.2f,Mem:%.2f,Disk:%.2f,Uptime:%s,LogSkipped:%d bytes】\n", CPU, Mem, Disk, time.Duration(Uptime)*time.Second, skipped)
+	} else {
+		fmt.Fprintf(&body, "【CPU:%.2f,Mem:%.2f,Disk:%.2f,Uptime:%s】\n", CPU, Mem, Disk, time.Duration(Uptime)*time.Second)
+	}
+	if _, err := io.Copy(&body, file); err != nil {
+		return nil
+	}
+
+	client := http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Post(postURL, "text/plain", &body)
 	if err != nil {
 		return nil
 	}
@@ -207,21 +232,25 @@ func (c *Controller) sendLogs() error {
 		return nil
 	}
 
-	os.Truncate(logFile, 0)
+	if err := os.Truncate(logFile, 0); err != nil {
+		c.logger.Print(err)
+	}
 	return nil
 }
 
 // Close implement the Close() function of the service interface
 func (c *Controller) Close() error {
+	var closeErr error
 	for i := range c.tasks {
 		if c.tasks[i].Periodic != nil {
 			if err := c.tasks[i].Periodic.Close(); err != nil {
-				c.logger.Panicf("%s periodic task close failed: %s", c.tasks[i].tag, err)
+				c.logger.Errorf("%s periodic task close failed: %s", c.tasks[i].tag, err)
+				closeErr = errors.Join(closeErr, err)
 			}
 		}
 	}
 
-	return nil
+	return closeErr
 }
 
 func (c *Controller) nodeInfoMonitor() (err error) {
@@ -264,6 +293,7 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 		if !reflect.DeepEqual(c.nodeInfo, newNodeInfo) {
 			// Remove old tag
 			oldTag := c.Tag
+			oldNodeType := c.nodeInfo.NodeType
 			err := c.removeOldTag(oldTag)
 			if err != nil {
 				c.logger.Print(err)
@@ -289,6 +319,12 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 			if err = c.DeleteInboundLimiter(oldTag); err != nil {
 				c.logger.Print(err)
 				return nil
+			}
+			if oldNodeType == "Shadowsocks-Plugin" {
+				if err = c.DeleteInboundLimiter(fmt.Sprintf("dokodemo-door_%s+1", oldTag)); err != nil {
+					c.logger.Print(err)
+					return nil
+				}
 			}
 		} else {
 			nodeInfoChanged = false
@@ -332,6 +368,9 @@ func (c *Controller) nodeInfoMonitor() (err error) {
 				}
 				err := c.removeUsers(deletedEmail, c.Tag)
 				if err != nil {
+					c.logger.Print(err)
+				}
+				if err := c.DeleteInboundLimiterUsers(c.Tag, &deleted); err != nil {
 					c.logger.Print(err)
 				}
 			}
