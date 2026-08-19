@@ -4,7 +4,7 @@ go 1.25
 
 require (
 	dario.cat/mergo v1.0.0
-	github.com/HZ-PRE/XrarCore v1.0.68
+	github.com/HZ-PRE/XrarCore v1.0.73
 	github.com/bitly/go-simplejson v0.5.1
 	github.com/deckarep/golang-set v1.8.0
 	github.com/eko/gocache/lib/v4 v4.1.6
@@ -249,3 +249,5 @@ require (
 )
 
 replace github.com/exoscale/egoscale => github.com/exoscale/egoscale v0.102.3
+
+replace github.com/HZ-PRE/XrarCore => ../Xray-core-main

@@ -1,22 +1,13 @@
-package pmpanel
+package newXboard
 
 import "encoding/json"
 
 // NodeInfoResponse is the response of node
 type NodeInfoResponse struct {
-	Class           int     `json:"clazz"`
-	SpeedLimit      float64 `json:"speedlimit"`
-	Method          string  `json:"method"`
-	TrafficRate     float64 `json:"trafficRate"`
-	RawServerString string  `json:"outServer"`
-	Port            uint32  `json:"outPort"`
-	AlterId         uint16  `json:"alterId"`
-	Network         string  `json:"network"`
-	Security        string  `json:"security"`
-	Host            string  `json:"host"`
-	Path            string  `json:"path"`
-	Grpc            bool    `json:"grpc"`
-	Sni             string  `json:"sni"`
+	SpeedLimit float64 `json:"speedlimit"`
+	Method     string  `json:"method"`
+	Port       uint32  `json:"outPort"`
+	Routes     []route `json:"routes"`
 }
 
 // UserResponse is the response of user
@@ -29,7 +20,8 @@ type UserResponse struct {
 
 // Response is the common response
 type Response struct {
-	Ret  uint            `json:"ret"`
+	Code uint            `json:"code"`
+	Msg  string          `json:"msg"`
 	Data json.RawMessage `json:"data"`
 }
 
@@ -61,9 +53,11 @@ type UserTraffic struct {
 	Ip       string `json:"ip"`
 }
 
-type RuleItem struct {
-	ID      int    `json:"id"`
-	Content string `json:"regex"`
+type route struct {
+	Id          int      `json:"id"`
+	Match       []string `json:"matchs"`
+	Action      string   `json:"actionFun"`
+	ActionValue string   `json:"actionValue"`
 }
 
 type IllegalItem struct {

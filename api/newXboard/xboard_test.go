@@ -1,11 +1,11 @@
-package pmpanel_test
+package newXboard_test
 
 import (
 	"fmt"
 	"testing"
 
 	"github.com/XrayR-project/XrayR/api"
-	"github.com/XrayR-project/XrayR/api/pmpanel"
+	xboard "github.com/XrayR-project/XrayR/api/newXboard"
 )
 
 func CreateClient() api.API {
@@ -13,9 +13,9 @@ func CreateClient() api.API {
 		APIHost:  "http://webapi.yyds.me",
 		Key:      "123456",
 		NodeID:   4,
-		NodeType: "V2ray",
+		NodeType: "ss",
 	}
-	client := pmpanel.New(apiConfig)
+	client := xboard.New(apiConfig)
 	return client
 }
 
@@ -36,7 +36,7 @@ func TestGetSSNodeinfo(t *testing.T) {
 		NodeID:   1,
 		NodeType: "Shadowsocks",
 	}
-	client := pmpanel.New(apiConfig)
+	client := xboard.New(apiConfig)
 	client.Debug()
 	nodeInfo, err := client.GetNodeInfo()
 	if err != nil {
@@ -52,7 +52,7 @@ func TestGetTrojanNodeinfo(t *testing.T) {
 		NodeID:   1,
 		NodeType: "Trojan",
 	}
-	client := pmpanel.New(apiConfig)
+	client := xboard.New(apiConfig)
 	client.Debug()
 	nodeInfo, err := client.GetNodeInfo()
 	if err != nil {
